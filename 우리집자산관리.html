@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>우리 집 자산관리</title>
+
+  <!-- PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="우리집자산" />
+  <meta name="theme-color" content="#2A9D8F" />
+  <link rel="manifest" href="manifest.json" />
+
+  <style>
+    :root {
+      --teal: #2A9D8F;
+      --teal-light: #4DB6AC;
+      --teal-dark: #1E7A70;
+      --cream: #FFF8F0;
+      --warm-gray: #F5F0EA;
+      --text-primary: #2C3E50;
+      --text-secondary: #7F8C8D;
+      --positive: #27AE60;
+      --negative: #E74C3C;
+      --gold: #F39C12;
+      --card-bg: #FFFFFF;
+      --border: #E8E0D5;
+      --shadow: 0 2px 12px rgba(42,157,143,0.08);
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Malgun Gothic', sans-serif;
+      background: var(--cream);
+      color: var(--text-primary);
+      min-height: 100vh;
+      max-width: 480px;
+      margin: 0 auto;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* ── 연결 상태 배너 ── */
+    .sync-banner {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 999;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 16px;
+      padding-top: calc(6px + var(--safe-top));
+      transition: all 0.3s;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .sync-banner.connecting { background: #F39C12; color: white; }
+    .sync-banner.connected  { background: var(--teal); color: white; }
+    .sync-banner.offline    { background: #E74C3C; color: white; }
+    .sync-banner.hidden     { display: none; }
+
+    /* ── 헤더 ── */
+    .app-header {
+      background: var(--teal);
+      color: white;
+      padding: 12px 20px 14px;
+      padding-top: calc(12px + var(--safe-top));
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .app-header-inner { display: flex; justify-content: space-between; align-items: center; }
+    .app-header h1 { font-size: 18px; font-weight: 700; }
+    .app-header .subtitle { font-size: 11px; opacity: 0.8; margin-top: 2px; }
+    .sync-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: rgba(255,255,255,0.4);
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+    .sync-dot.live { background: #A8F0B8; animation: pulse 2s infinite; }
+    .sync-dot.offline { background: #FF8A80; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── 탭 네비게이션 ── */
+    .tab-nav {
+      display: flex;
+      background: white;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 62px;
+      z-index: 99;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px 4px 8px;
+      border: none;
+      background: transparent;
+      font-size: 10px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      transition: all 0.2s;
+    }
+    .tab-btn .tab-icon { font-size: 20px; }
+    .tab-btn.active { color: var(--teal); border-bottom: 2px solid var(--teal); }
+
+    /* ── 화면 ── */
+    .screen { display: none; padding: 14px 14px calc(20px + var(--safe-bottom)); }
+    .screen.active { display: block; }
+
+    /* ── 카드 ── */
+    .card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 12px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+    }
+    .card-title {
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 12px;
+    }
+
+    /* ── 홈 ── */
+    .net-worth-card {
+      background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%);
+      color: white;
+      border-radius: 20px;
+      padding: 24px 20px;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .net-worth-label { font-size: 12px; opacity: 0.85; margin-bottom: 6px; }
+    .net-worth-value { font-size: 34px; font-weight: 800; letter-spacing: -1px; }
+    .net-worth-sub { font-size: 11px; opacity: 0.75; margin-top: 6px; }
+    .net-worth-breakdown {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255,255,255,0.2);
+    }
+    .breakdown-item { text-align: center; }
+    .breakdown-label { font-size: 10px; opacity: 0.7; }
+    .breakdown-value { font-size: 15px; font-weight: 700; margin-top: 2px; }
+
+    .goal-item { margin-bottom: 14px; }
+    .goal-item:last-child { margin-bottom: 0; }
+    .goal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .goal-name { font-size: 14px; font-weight: 600; }
+    .goal-emoji { margin-right: 5px; }
+    .goal-pct { font-size: 13px; font-weight: 700; color: var(--teal); }
+    .goal-bar-bg { height: 7px; background: var(--warm-gray); border-radius: 99px; overflow: hidden; }
+    .goal-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--teal-light), var(--teal));
+      border-radius: 99px;
+      transition: width 0.6s ease;
+    }
+    .goal-amounts { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-secondary); margin-top: 3px; }
+
+    .month-summary { display: flex; gap: 8px; }
+    .month-box { flex: 1; background: var(--warm-gray); border-radius: 12px; padding: 12px; text-align: center; }
+    .month-box-label { font-size: 10px; color: var(--text-secondary); }
+    .month-box-value { font-size: 16px; font-weight: 700; margin-top: 3px; }
+    .month-box-value.income { color: var(--positive); }
+    .month-box-value.expense { color: var(--negative); }
+    .month-box-value.savings { color: var(--teal); }
+
+    /* ── 기록 ── */
+    .record-tabs {
+      display: flex;
+      background: var(--warm-gray);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 14px;
+    }
+    .record-tab {
+      flex: 1; padding: 10px; border: none; border-radius: 10px;
+      background: transparent; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s; color: var(--text-secondary);
+    }
+    .record-tab.active { background: white; color: var(--teal); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
+    .form-group { margin-bottom: 12px; }
+    .form-label { font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-bottom: 5px; display: block; }
+    .form-input {
+      width: 100%; padding: 11px 13px;
+      border: 1.5px solid var(--border); border-radius: 10px;
+      font-size: 15px; background: white; outline: none;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+    .form-input:focus { border-color: var(--teal); }
+    .form-select {
+      width: 100%; padding: 11px 13px;
+      border: 1.5px solid var(--border); border-radius: 10px;
+      font-size: 15px; background: white; outline: none;
+      appearance: none; -webkit-appearance: none; cursor: pointer;
+    }
+    .btn-primary {
+      width: 100%; padding: 14px;
+      background: var(--teal); color: white;
+      border: none; border-radius: 12px;
+      font-size: 16px; font-weight: 700; cursor: pointer;
+      transition: background 0.2s; -webkit-appearance: none;
+    }
+    .btn-primary:active { background: var(--teal-dark); }
+    .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* 거래 내역 */
+    .tx-list { margin-top: 14px; }
+    .tx-item {
+      display: flex; align-items: center;
+      padding: 11px 0; border-bottom: 1px solid var(--border);
+    }
+    .tx-item:last-child { border-bottom: none; }
+    .tx-icon {
+      width: 38px; height: 38px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; margin-right: 10px; flex-shrink: 0;
+    }
+    .tx-icon.income-icon { background: #E8F8F0; }
+    .tx-icon.expense-icon { background: #FDE8E8; }
+    .tx-info { flex: 1; min-width: 0; }
+    .tx-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tx-cat { font-size: 10px; color: var(--text-secondary); margin-top: 1px; }
+    .tx-amount { font-size: 14px; font-weight: 700; white-space: nowrap; }
+    .tx-amount.income { color: var(--positive); }
+    .tx-amount.expense { color: var(--negative); }
+    .tx-date { font-size: 10px; color: var(--text-secondary); margin-top: 2px; text-align: right; }
+    .tx-who-badge {
+      font-size: 10px; padding: 1px 6px; border-radius: 99px;
+      background: var(--warm-gray); color: var(--text-secondary);
+      margin-left: 4px; white-space: nowrap;
+    }
+
+    /* ── 자산 ── */
+    .asset-section-title {
+      font-size: 12px; font-weight: 700; color: var(--text-secondary);
+      margin: 14px 0 6px;
+    }
+    .asset-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 14px; background: white; border-radius: 12px;
+      margin-bottom: 7px; border: 1px solid var(--border);
+    }
+    .asset-item-left { display: flex; align-items: center; gap: 10px; }
+    .asset-emoji { font-size: 20px; }
+    .asset-name { font-size: 14px; font-weight: 600; }
+    .asset-value { font-size: 14px; font-weight: 700; }
+    .asset-value.debt { color: var(--negative); }
+    .asset-total-row {
+      display: flex; justify-content: space-between;
+      padding: 13px 14px; background: var(--warm-gray);
+      border-radius: 12px; font-weight: 700; font-size: 14px; margin-top: 3px;
+    }
+    .btn-add {
+      width: 100%; padding: 11px;
+      background: transparent; color: var(--teal);
+      border: 2px dashed var(--teal-light); border-radius: 12px;
+      font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 4px;
+      transition: all 0.2s;
+    }
+    .btn-add:active { background: rgba(42,157,143,0.06); }
+
+    /* ── 목표 ── */
+    .goal-card {
+      background: white; border-radius: 16px; padding: 18px;
+      margin-bottom: 10px; border: 1px solid var(--border);
+    }
+    .goal-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .goal-card-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 7px; }
+    .goal-status { font-size: 11px; padding: 3px 10px; border-radius: 99px; font-weight: 600; }
+    .goal-status.on-track { background: #E8F8F0; color: var(--positive); }
+    .goal-status.behind   { background: #FDE8E8; color: var(--negative); }
+    .goal-big-bar-bg { height: 10px; background: var(--warm-gray); border-radius: 99px; overflow: hidden; margin-bottom: 7px; }
+    .goal-big-bar-fill { height: 100%; border-radius: 99px; transition: width 0.8s ease; }
+    .goal-big-bar-fill.green { background: linear-gradient(90deg, #4CAF50, #27AE60); }
+    .goal-big-bar-fill.teal  { background: linear-gradient(90deg, var(--teal-light), var(--teal)); }
+    .goal-big-bar-fill.gold  { background: linear-gradient(90deg, #F7C948, var(--gold)); }
+    .goal-detail-row { display: flex; justify-content: space-between; font-size: 13px; margin-top: 6px; }
+    .goal-detail-row span:first-child { color: var(--text-secondary); }
+    .goal-detail-row span:last-child { font-weight: 600; }
+
+    .add-goal-form {
+      background: white; border-radius: 16px; padding: 18px;
+      border: 2px dashed var(--teal-light); margin-bottom: 10px; display: none;
+    }
+    .add-goal-form.open { display: block; }
+    .emoji-picker { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 6px; }
+    .emoji-opt {
+      width: 34px; height: 34px; border: 2px solid var(--border); border-radius: 8px;
+      background: white; font-size: 17px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+    }
+    .emoji-opt.selected { border-color: var(--teal); background: rgba(42,157,143,0.08); }
+
+    /* ── 설정 ── */
+    .setting-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 14px 0; border-bottom: 1px solid var(--border);
+    }
+    .setting-item:last-child { border-bottom: none; }
+    .setting-label { font-size: 15px; font-weight: 600; }
+    .setting-desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+    .couple-badge {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--warm-gray); padding: 7px 12px;
+      border-radius: 99px; font-size: 12px; font-weight: 600;
+    }
+
+    /* ── 모달 ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 200;
+      align-items: flex-end; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white; border-radius: 24px 24px 0 0;
+      padding: 20px 18px calc(24px + var(--safe-bottom));
+      width: 100%; max-width: 480px;
+      max-height: 90vh; overflow-y: auto;
+    }
+    .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 99px; margin: 0 auto 18px; }
+    .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 18px; }
+
+    /* ── 토스트 ── */
+    .toast {
+      position: fixed;
+      bottom: calc(24px + var(--safe-bottom));
+      left: 50%; transform: translateX(-50%) translateY(80px);
+      background: #2C3E50; color: white;
+      padding: 11px 20px; border-radius: 99px;
+      font-size: 13px; font-weight: 600; z-index: 300;
+      transition: transform 0.3s ease; white-space: nowrap;
+      max-width: calc(100vw - 32px); text-align: center;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ── 빈 상태 ── */
+    .empty-state { text-align: center; padding: 28px 16px; color: var(--text-secondary); }
+    .empty-state .empty-icon { font-size: 36px; margin-bottom: 10px; }
+    .empty-state p { font-size: 13px; line-height: 1.6; }
+
+    /* ── 로딩 스피너 ── */
+    .spinner {
+      display: inline-block; width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white; border-radius: 50%;
+      animation: spin 0.7s linear infinite; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<!-- ── 헤더 ── -->
+<header class="app-header">
+  <div class="app-header-inner">
+    <div>
+      <h1>🏡 우리 집 자산관리</h1>
+      <div class="subtitle" id="headerDate"></div>
+    </div>
+    <div class="sync-dot" id="syncDot" title="Firebase 연결 상태"></div>
+  </div>
+</header>
+
+<!-- ── 탭 네비게이션 ── -->
+<nav class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('home')">
+    <span class="tab-icon">🏠</span>홈
+  </button>
+  <button class="tab-btn" onclick="switchTab('record')">
+    <span class="tab-icon">✏️</span>기록
+  </button>
+  <button class="tab-btn" onclick="switchTab('asset')">
+    <span class="tab-icon">💰</span>자산
+  </button>
+  <button class="tab-btn" onclick="switchTab('goal')">
+    <span class="tab-icon">🎯</span>목표
+  </button>
+  <button class="tab-btn" onclick="switchTab('setting')">
+    <span class="tab-icon">⚙️</span>설정
+  </button>
+</nav>
+
+<!-- ═══ 홈 ═══ -->
+<section class="screen active" id="screen-home">
+  <div class="net-worth-card">
+    <div class="net-worth-label">순자산</div>
+    <div class="net-worth-value" id="homeNetWorth">₩0</div>
+    <div class="net-worth-sub" id="homeNetWorthMsg">함께 시작하는 우리의 첫 걸음 💚</div>
+    <div class="net-worth-breakdown">
+      <div class="breakdown-item">
+        <div class="breakdown-label">자산</div>
+        <div class="breakdown-value" id="homeAssetTotal">₩0</div>
+      </div>
+      <div class="breakdown-item">
+        <div class="breakdown-label">부채</div>
+        <div class="breakdown-value" id="homeDebtTotal">₩0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title" id="homeMonthLabel">이번 달 요약</div>
+    <div class="month-summary">
+      <div class="month-box">
+        <div class="month-box-label">수입</div>
+        <div class="month-box-value income" id="homeMonthIncome">₩0</div>
+      </div>
+      <div class="month-box">
+        <div class="month-box-label">지출</div>
+        <div class="month-box-value expense" id="homeMonthExpense">₩0</div>
+      </div>
+      <div class="month-box">
+        <div class="month-box-label">저축</div>
+        <div class="month-box-value savings" id="homeMonthSavings">₩0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">목표 진행률</div>
+    <div id="homeGoalList">
+      <div class="empty-state"><div class="empty-icon">🎯</div><p>목표를 설정하면 여기에 보여요</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 기록 ═══ -->
+<section class="screen" id="screen-record">
+  <div class="record-tabs">
+    <button class="record-tab active" id="incomeTab" onclick="switchRecordTab('income')">+ 수입</button>
+    <button class="record-tab" id="expenseTab" onclick="switchRecordTab('expense')">- 지출</button>
+  </div>
+  <div class="card">
+    <div class="form-group">
+      <label class="form-label">금액 (원)</label>
+      <input type="number" class="form-input" id="txAmount" placeholder="0" min="0" inputmode="numeric" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">내역</label>
+      <input type="text" class="form-input" id="txName" placeholder="예) 월급, 마트 장보기" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">카테고리</label>
+      <select class="form-select" id="txCategory"><option value="">선택하세요</option></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">날짜</label>
+      <input type="date" class="form-input" id="txDate" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">누가</label>
+      <select class="form-select" id="txWho">
+        <option value="남편">남편</option>
+        <option value="와이프">와이프</option>
+        <option value="공동">공동</option>
+      </select>
+    </div>
+    <button class="btn-primary" id="txSubmitBtn" onclick="addTransaction()">기록하기</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">최근 내역</div>
+    <div class="tx-list" id="txList">
+      <div class="empty-state"><div class="empty-icon">✏️</div><p>첫 번째 기록을 남겨보세요</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ 자산 ═══ -->
+<section class="screen" id="screen-asset">
+  <div class="asset-section-title">자산</div>
+  <div id="assetList"></div>
+  <div class="asset-total-row"><span>자산 합계</span><span id="assetSum">₩0</span></div>
+  <button class="btn-add" onclick="openAssetModal('asset')">+ 자산 추가</button>
+
+  <div class="asset-section-title">부채</div>
+  <div id="debtList"></div>
+  <div class="asset-total-row"><span>부채 합계</span><span id="debtSum" style="color:var(--negative)">₩0</span></div>
+  <button class="btn-add" onclick="openAssetModal('debt')">+ 부채 추가</button>
+
+  <div class="asset-section-title">투자</div>
+  <div id="investList"></div>
+  <div class="asset-total-row"><span>투자 합계</span><span id="investSum">₩0</span></div>
+  <button class="btn-add" onclick="openAssetModal('invest')">+ 투자 추가</button>
+</section>
+
+<!-- ═══ 목표 ═══ -->
+<section class="screen" id="screen-goal">
+  <button class="btn-add" style="margin-bottom:10px" onclick="toggleGoalForm()">+ 새 목표 추가</button>
+  <div class="add-goal-form" id="addGoalForm">
+    <div class="card-title">새 목표 만들기</div>
+    <div class="form-group">
+      <label class="form-label">목표 아이콘</label>
+      <div class="emoji-picker">
+        <button class="emoji-opt selected" data-emoji="🏠" onclick="selectEmoji(this)">🏠</button>
+        <button class="emoji-opt" data-emoji="✈️" onclick="selectEmoji(this)">✈️</button>
+        <button class="emoji-opt" data-emoji="🚗" onclick="selectEmoji(this)">🚗</button>
+        <button class="emoji-opt" data-emoji="🛡️" onclick="selectEmoji(this)">🛡️</button>
+        <button class="emoji-opt" data-emoji="👶" onclick="selectEmoji(this)">👶</button>
+        <button class="emoji-opt" data-emoji="🎓" onclick="selectEmoji(this)">🎓</button>
+        <button class="emoji-opt" data-emoji="💍" onclick="selectEmoji(this)">💍</button>
+        <button class="emoji-opt" data-emoji="🌿" onclick="selectEmoji(this)">🌿</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">목표 이름</label>
+      <input type="text" class="form-input" id="goalName" placeholder="예) 비상금 마련, 유럽 여행" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">목표 금액 (원)</label>
+      <input type="number" class="form-input" id="goalTarget" placeholder="5000000" min="0" inputmode="numeric" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">현재 모인 금액 (원)</label>
+      <input type="number" class="form-input" id="goalCurrent" placeholder="0" min="0" inputmode="numeric" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">목표 기한</label>
+      <input type="month" class="form-input" id="goalDeadline" />
+    </div>
+    <button class="btn-primary" onclick="addGoal()">목표 저장</button>
+  </div>
+  <div id="goalList">
+    <div class="empty-state"><div class="empty-icon">🎯</div><p>첫 목표를 만들어보세요!<br>작은 목표 하나가 시작입니다.</p></div>
+  </div>
+</section>
+
+<!-- ═══ 설정 ═══ -->
+<section class="screen" id="screen-setting">
+  <div class="card">
+    <div class="card-title">프로필</div>
+    <div class="setting-item">
+      <div><div class="setting-label">남편 이름</div></div>
+      <input type="text" class="form-input" id="husbandName" placeholder="이름 입력"
+        style="width:110px;padding:7px 11px;font-size:14px" onchange="saveSettings()" />
+    </div>
+    <div class="setting-item">
+      <div><div class="setting-label">와이프 이름</div></div>
+      <input type="text" class="form-input" id="wifeName" placeholder="이름 입력"
+        style="width:110px;padding:7px 11px;font-size:14px" onchange="saveSettings()" />
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Firebase 동기화</div>
+    <div class="setting-item">
+      <div>
+        <div class="setting-label">👫 실시간 공유</div>
+        <div class="setting-desc" id="syncStatusText">연결 중...</div>
+      </div>
+      <div class="couple-badge" id="syncBadge">⏳ 연결 중</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">데이터</div>
+    <div class="setting-item">
+      <div>
+        <div class="setting-label">데이터 내보내기</div>
+        <div class="setting-desc">JSON 파일로 백업</div>
+      </div>
+      <button class="btn-primary" style="width:auto;padding:7px 14px;font-size:13px" onclick="exportData()">내보내기</button>
+    </div>
+    <div class="setting-item">
+      <div>
+        <div class="setting-label" style="color:var(--negative)">데이터 초기화</div>
+        <div class="setting-desc">Firebase의 모든 데이터 삭제</div>
+      </div>
+      <button style="padding:7px 14px;font-size:13px;background:var(--negative);color:white;border:none;border-radius:8px;cursor:pointer"
+        onclick="resetData()">초기화</button>
+    </div>
+  </div>
+
+  <div class="card" style="text-align:center;padding:14px">
+    <p style="font-size:11px;color:var(--text-secondary)">우리 집 자산관리 v2.0 · Firebase 실시간 동기화<br>🔒 woori-jasangi.firebaseapp.com</p>
+  </div>
+</section>
+
+<!-- ── 자산 추가 모달 ── -->
+<div class="modal-overlay" id="assetModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="assetModalTitle">자산 추가</div>
+    <input type="hidden" id="assetModalType" />
+    <div class="form-group">
+      <label class="form-label">이름</label>
+      <input type="text" class="form-input" id="assetModalName" placeholder="예) 국민은행 예금" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">금액 (원)</label>
+      <input type="number" class="form-input" id="assetModalValue" placeholder="0" min="0" inputmode="numeric" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">아이콘</label>
+      <div class="emoji-picker" id="assetEmojiPicker">
+        <button class="emoji-opt selected" data-emoji="🏦" onclick="selectAssetEmoji(this)">🏦</button>
+        <button class="emoji-opt" data-emoji="🏠" onclick="selectAssetEmoji(this)">🏠</button>
+        <button class="emoji-opt" data-emoji="🚗" onclick="selectAssetEmoji(this)">🚗</button>
+        <button class="emoji-opt" data-emoji="💵" onclick="selectAssetEmoji(this)">💵</button>
+        <button class="emoji-opt" data-emoji="📈" onclick="selectAssetEmoji(this)">📈</button>
+        <button class="emoji-opt" data-emoji="🪙" onclick="selectAssetEmoji(this)">🪙</button>
+        <button class="emoji-opt" data-emoji="💳" onclick="selectAssetEmoji(this)">💳</button>
+        <button class="emoji-opt" data-emoji="📦" onclick="selectAssetEmoji(this)">📦</button>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="saveAsset()">저장</button>
+    <button style="width:100%;padding:11px;background:transparent;border:none;color:var(--text-secondary);font-size:14px;cursor:pointer;margin-top:6px" onclick="closeAssetModal()">취소</button>
+  </div>
+</div>
+
+<!-- ── 토스트 ── -->
+<div class="toast" id="toast"></div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getDatabase, ref, onValue, set, push, remove, update, serverTimestamp }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+
+// ═══════════════════════════════════
+// Firebase 초기화
+// ═══════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyC7s5OCPUYmyFtW2h_PkW50QYu9X0wNq5E",
+  authDomain: "woori-jasangi.firebaseapp.com",
+  projectId: "woori-jasangi",
+  storageBucket: "woori-jasangi.firebasestorage.app",
+  messagingSenderId: "203066420682",
+  appId: "1:203066420682:web:10bd64624cec2dc60d7333",
+  databaseURL: "https://woori-jasangi-default-rtdb.firebaseio.com"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+
+// ═══════════════════════════════════
+// 로컬 상태 (Firebase에서 채워짐)
+// ═══════════════════════════════════
+window.DB = {
+  transactions: {},
+  assets: {},
+  debts: {},
+  investments: {},
+  goals: {},
+  settings: { husbandName: '남편', wifeName: '와이프' }
+};
+
+// ═══════════════════════════════════
+// 유틸
+// ═══════════════════════════════════
+window.fmt = (n) => n === 0 ? '₩0' : '₩' + Math.abs(Math.round(n)).toLocaleString('ko-KR');
+window.fmtSigned = (n) => (n >= 0 ? '+' : '-') + window.fmt(n);
+window.today = () => new Date().toISOString().slice(0, 10);
+window.thisMonth = () => new Date().toISOString().slice(0, 7);
+
+window.showToast = (msg) => {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+};
+
+// ═══════════════════════════════════
+// 연결 상태
+// ═══════════════════════════════════
+function setConnected(ok) {
+  const dot = document.getElementById('syncDot');
+  const badge = document.getElementById('syncBadge');
+  const text = document.getElementById('syncStatusText');
+  if (ok) {
+    dot.className = 'sync-dot live';
+    badge.textContent = '💚 실시간 연결됨';
+    text.textContent = '남편·와이프 데이터 실시간 공유 중';
+  } else {
+    dot.className = 'sync-dot offline';
+    badge.textContent = '🔴 오프라인';
+    text.textContent = '네트워크 연결을 확인해주세요';
+  }
+}
+
+const connRef = ref(db, '.info/connected');
+onValue(connRef, (snap) => setConnected(snap.val() === true));
+
+// ═══════════════════════════════════
+// Firebase 실시간 리스너
+// ═══════════════════════════════════
+function listenPath(path, key) {
+  onValue(ref(db, path), (snap) => {
+    window.DB[key] = snap.val() || {};
+    renderAll();
+  });
+}
+
+listenPath('transactions', 'transactions');
+listenPath('assets',       'assets');
+listenPath('debts',        'debts');
+listenPath('investments',  'investments');
+listenPath('goals',        'goals');
+listenPath('settings',     'settings');
+
+// ═══════════════════════════════════
+// 탭 전환
+// ═══════════════════════════════════
+window.switchTab = (tab) => {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('screen-' + tab).classList.add('active');
+  const idx = ['home','record','asset','goal','setting'].indexOf(tab);
+  document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+};
+
+// ═══════════════════════════════════
+// 기록
+// ═══════════════════════════════════
+const incomeCategories  = ['급여', '부업/프리랜서', '이자/배당', '기타수입'];
+const expenseCategories = ['식비', '교통', '생활용품', '의류', '의료/건강', '문화/여가', '교육', '공과금', '통신비', '외식', '경조사', '기타'];
+let currentRecordTab = 'income';
+
+window.switchRecordTab = (type) => {
+  currentRecordTab = type;
+  document.getElementById('incomeTab').classList.toggle('active', type === 'income');
+  document.getElementById('expenseTab').classList.toggle('active', type === 'expense');
+  renderCategorySelect();
+};
+
+function renderCategorySelect() {
+  const cats = currentRecordTab === 'income' ? incomeCategories : expenseCategories;
+  document.getElementById('txCategory').innerHTML =
+    '<option value="">카테고리 선택</option>' +
+    cats.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+window.addTransaction = async () => {
+  const amount   = parseFloat(document.getElementById('txAmount').value);
+  const name     = document.getElementById('txName').value.trim();
+  const category = document.getElementById('txCategory').value;
+  const date     = document.getElementById('txDate').value || window.today();
+  const who      = document.getElementById('txWho').value;
+
+  if (!amount || amount <= 0) { window.showToast('금액을 입력해주세요'); return; }
+  if (!name)     { window.showToast('내역을 입력해주세요'); return; }
+  if (!category) { window.showToast('카테고리를 선택해주세요'); return; }
+
+  const btn = document.getElementById('txSubmitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  try {
+    await push(ref(db, 'transactions'), {
+      type: currentRecordTab, amount, name, category, date, who,
+      createdAt: Date.now()
+    });
+    document.getElementById('txAmount').value = '';
+    document.getElementById('txName').value = '';
+    window.showToast(currentRecordTab === 'income' ? '💚 수입이 기록되었어요!' : '✏️ 지출이 기록되었어요!');
+  } catch(e) {
+    window.showToast('⚠️ 저장 실패. 네트워크를 확인해주세요');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '기록하기';
+  }
+};
+
+window.deleteTransaction = async (id) => {
+  if (!confirm('이 내역을 삭제할까요?')) return;
+  await remove(ref(db, `transactions/${id}`));
+};
+
+function renderTransactions() {
+  const list = document.getElementById('txList');
+  const items = Object.entries(window.DB.transactions || {})
+    .map(([id, v]) => ({...v, id}))
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    .slice(0, 20);
+
+  if (!items.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">✏️</div><p>첫 번째 기록을 남겨보세요</p></div>';
+    return;
+  }
+  list.innerHTML = items.map(tx => `
+    <div class="tx-item">
+      <div class="tx-icon ${tx.type}-icon">${tx.type === 'income' ? '💚' : '🧾'}</div>
+      <div class="tx-info">
+        <div class="tx-name">${escHtml(tx.name)}</div>
+        <div class="tx-cat">${escHtml(tx.category)} <span class="tx-who-badge">${escHtml(tx.who)}</span></div>
+      </div>
+      <div>
+        <div class="tx-amount ${tx.type}">${tx.type === 'income' ? '+' : '-'}${window.fmt(tx.amount)}</div>
+        <div class="tx-date">${tx.date}</div>
+      </div>
+      <button onclick="deleteTransaction('${tx.id}')" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:15px;padding-left:8px;flex-shrink:0">✕</button>
+    </div>
+  `).join('');
+}
+
+// ═══════════════════════════════════
+// 자산
+// ═══════════════════════════════════
+let assetModalMode = 'asset';
+let selectedAssetEmoji = '🏦';
+
+window.openAssetModal = (type) => {
+  assetModalMode = type;
+  selectedAssetEmoji = type === 'debt' ? '💳' : type === 'invest' ? '📈' : '🏦';
+  document.getElementById('assetModalTitle').textContent = {asset:'자산 추가',debt:'부채 추가',invest:'투자 추가'}[type];
+  document.getElementById('assetModalType').value = type;
+  document.getElementById('assetModalName').value = '';
+  document.getElementById('assetModalValue').value = '';
+  document.getElementById('assetModal').classList.add('open');
+  document.querySelectorAll('#assetEmojiPicker .emoji-opt').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.emoji === selectedAssetEmoji);
+  });
+};
+window.closeAssetModal = () => document.getElementById('assetModal').classList.remove('open');
+window.selectAssetEmoji = (btn) => {
+  document.querySelectorAll('#assetEmojiPicker .emoji-opt').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedAssetEmoji = btn.dataset.emoji;
+};
+
+window.saveAsset = async () => {
+  const name  = document.getElementById('assetModalName').value.trim();
+  const value = parseFloat(document.getElementById('assetModalValue').value);
+  const type  = document.getElementById('assetModalType').value;
+  if (!name)             { window.showToast('이름을 입력해주세요'); return; }
+  if (!value || value<=0){ window.showToast('금액을 입력해주세요'); return; }
+  const pathMap = {asset:'assets', debt:'debts', invest:'investments'};
+  await push(ref(db, pathMap[type]), { name, value, emoji: selectedAssetEmoji, createdAt: Date.now() });
+  window.closeAssetModal();
+  window.showToast('저장되었어요 ✅');
+};
+
+window.deleteAssetItem = async (type, id) => {
+  if (!confirm('삭제할까요?')) return;
+  const pathMap = {asset:'assets', debt:'debts', invest:'investments'};
+  await remove(ref(db, `${pathMap[type]}/${id}`));
+};
+
+function renderAssets() {
+  const renderList = (data, containerId, type) => {
+    const el = document.getElementById(containerId);
+    const items = Object.entries(data || {}).map(([id,v]) => ({...v, id}));
+    if (!items.length) {
+      el.innerHTML = `<div style="padding:10px 0;color:var(--text-secondary);font-size:12px;text-align:center">아직 없어요</div>`;
+      return 0;
+    }
+    el.innerHTML = items.map(item => `
+      <div class="asset-item">
+        <div class="asset-item-left">
+          <span class="asset-emoji">${item.emoji}</span>
+          <div class="asset-name">${escHtml(item.name)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="asset-value ${type==='debt'?'debt':''}">${type==='debt'?'-':''}${window.fmt(item.value)}</div>
+          <button onclick="deleteAssetItem('${type}','${item.id}')" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:15px">✕</button>
+        </div>
+      </div>
+    `).join('');
+    return items.reduce((s,x) => s + x.value, 0);
+  };
+
+  const assetSum  = renderList(window.DB.assets,      'assetList',  'asset');
+  const debtSum   = renderList(window.DB.debts,       'debtList',   'debt');
+  const investSum = renderList(window.DB.investments, 'investList', 'invest');
+  document.getElementById('assetSum').textContent  = window.fmt(assetSum);
+  document.getElementById('debtSum').textContent   = window.fmt(debtSum);
+  document.getElementById('investSum').textContent = window.fmt(investSum);
+}
+
+// ═══════════════════════════════════
+// 목표
+// ═══════════════════════════════════
+let selectedGoalEmoji = '🏠';
+
+window.toggleGoalForm = () => document.getElementById('addGoalForm').classList.toggle('open');
+window.selectEmoji = (btn) => {
+  document.querySelectorAll('#addGoalForm .emoji-opt').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedGoalEmoji = btn.dataset.emoji;
+};
+
+window.addGoal = async () => {
+  const name     = document.getElementById('goalName').value.trim();
+  const target   = parseFloat(document.getElementById('goalTarget').value);
+  const current  = parseFloat(document.getElementById('goalCurrent').value) || 0;
+  const deadline = document.getElementById('goalDeadline').value;
+  if (!name)            { window.showToast('목표 이름을 입력해주세요'); return; }
+  if (!target || target<=0){ window.showToast('목표 금액을 입력해주세요'); return; }
+  await push(ref(db, 'goals'), { name, emoji: selectedGoalEmoji, target, current, deadline, createdAt: Date.now() });
+  ['goalName','goalTarget','goalCurrent','goalDeadline'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('addGoalForm').classList.remove('open');
+  window.showToast('🎯 목표가 추가되었어요!');
+};
+
+window.updateGoalCurrent = async (id) => {
+  const goal = window.DB.goals[id];
+  if (!goal) return;
+  const newVal = prompt('현재 금액을 입력해주세요 (원)', goal.current);
+  if (newVal === null) return;
+  const v = parseFloat(newVal);
+  if (isNaN(v) || v < 0) { window.showToast('올바른 금액을 입력해주세요'); return; }
+  await update(ref(db, `goals/${id}`), { current: v });
+  window.showToast('목표 금액이 업데이트되었어요 ✅');
+};
+
+window.deleteGoal = async (id) => {
+  if (!confirm('목표를 삭제할까요?')) return;
+  await remove(ref(db, `goals/${id}`));
+};
+
+function renderGoals() {
+  const el = document.getElementById('goalList');
+  const items = Object.entries(window.DB.goals || {}).map(([id,v]) => ({...v, id}))
+    .sort((a,b) => (a.createdAt||0)-(b.createdAt||0));
+  if (!items.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">🎯</div><p>첫 목표를 만들어보세요!<br>작은 목표 하나가 시작입니다.</p></div>';
+    return;
+  }
+  const colors = ['teal','green','gold','teal'];
+  el.innerHTML = items.map((goal, i) => {
+    const pct = Math.min(100, Math.round((goal.current / goal.target) * 100));
+    const remaining = goal.target - goal.current;
+    const deadlineText = goal.deadline ? (() => { const [y,m] = goal.deadline.split('-'); return `${y}년 ${m}월`; })() : '';
+    return `
+      <div class="goal-card">
+        <div class="goal-card-header">
+          <div class="goal-card-title"><span>${goal.emoji}</span>${escHtml(goal.name)}</div>
+          <span class="goal-status ${pct>=50?'on-track':'behind'}">${pct}%</span>
+        </div>
+        <div class="goal-big-bar-bg">
+          <div class="goal-big-bar-fill ${colors[i%colors.length]}" style="width:${pct}%"></div>
+        </div>
+        <div class="goal-detail-row"><span>현재</span><span>${window.fmt(goal.current)}</span></div>
+        <div class="goal-detail-row"><span>목표</span><span>${window.fmt(goal.target)}</span></div>
+        <div class="goal-detail-row"><span>남은 금액</span><span style="color:var(--teal)">${window.fmt(remaining)}</span></div>
+        ${deadlineText ? `<div class="goal-detail-row"><span>기한</span><span>${deadlineText}</span></div>` : ''}
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button onclick="updateGoalCurrent('${goal.id}')" style="flex:1;padding:9px;background:var(--teal);color:white;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">금액 수정</button>
+          <button onclick="deleteGoal('${goal.id}')" style="padding:9px 13px;background:var(--warm-gray);border:none;border-radius:10px;font-size:13px;cursor:pointer;color:var(--negative)">삭제</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════
+// 홈
+// ═══════════════════════════════════
+function renderHome() {
+  const assetTotal = Object.values(window.DB.assets||{}).reduce((s,x)=>s+x.value,0)
+    + Object.values(window.DB.investments||{}).reduce((s,x)=>s+x.value,0);
+  const debtTotal = Object.values(window.DB.debts||{}).reduce((s,x)=>s+x.value,0);
+  const netWorth  = assetTotal - debtTotal;
+  document.getElementById('homeNetWorth').textContent  = window.fmt(netWorth);
+  document.getElementById('homeAssetTotal').textContent= window.fmt(assetTotal);
+  document.getElementById('homeDebtTotal').textContent = window.fmt(debtTotal);
+
+  const now = window.thisMonth();
+  const txs = Object.values(window.DB.transactions||{}).filter(t=>t.date&&t.date.startsWith(now));
+  const income  = txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const expense = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const d = new Date();
+  document.getElementById('homeMonthLabel').textContent    = `${d.getMonth()+1}월 요약`;
+  document.getElementById('homeMonthIncome').textContent   = window.fmt(income);
+  document.getElementById('homeMonthExpense').textContent  = window.fmt(expense);
+  document.getElementById('homeMonthSavings').textContent  = window.fmtSigned(income - expense);
+
+  const goals = Object.entries(window.DB.goals||{}).map(([id,v])=>({...v,id}))
+    .sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).slice(0,3);
+  const goalEl = document.getElementById('homeGoalList');
+  if (!goals.length) {
+    goalEl.innerHTML = '<div class="empty-state"><div class="empty-icon">🎯</div><p>목표 탭에서 목표를 추가해보세요</p></div>';
+    return;
+  }
+  goalEl.innerHTML = goals.map(goal => {
+    const pct = Math.min(100, Math.round((goal.current/goal.target)*100));
+    return `
+      <div class="goal-item">
+        <div class="goal-header">
+          <div class="goal-name"><span class="goal-emoji">${goal.emoji}</span>${escHtml(goal.name)}</div>
+          <div class="goal-pct">${pct}%</div>
+        </div>
+        <div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${pct}%"></div></div>
+        <div class="goal-amounts"><span>${window.fmt(goal.current)}</span><span>목표 ${window.fmt(goal.target)}</span></div>
+      </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════
+// 설정
+// ═══════════════════════════════════
+window.saveSettings = async () => {
+  const h = document.getElementById('husbandName').value || '남편';
+  const w = document.getElementById('wifeName').value || '와이프';
+  await set(ref(db, 'settings'), { husbandName: h, wifeName: w });
+  window.showToast('설정이 저장되었어요');
+};
+
+function renderSettings() {
+  const s = window.DB.settings || {};
+  document.getElementById('husbandName').value = s.husbandName || '';
+  document.getElementById('wifeName').value    = s.wifeName    || '';
+  // txWho 옵션도 이름 반영
+  const whoSel = document.getElementById('txWho');
+  if (whoSel) {
+    whoSel.options[0].text = s.husbandName || '남편';
+    whoSel.options[1].text = s.wifeName    || '와이프';
+  }
+}
+
+window.exportData = () => {
+  const blob = new Blob([JSON.stringify(window.DB, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `우리집자산_${window.today()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  window.showToast('📦 내보내기 완료!');
+};
+
+window.resetData = async () => {
+  if (!confirm('Firebase의 모든 데이터를 삭제할까요?\n이 작업은 되돌릴 수 없습니다.')) return;
+  if (!confirm('정말 삭제하시겠어요? 부부 모두의 데이터가 사라집니다.')) return;
+  await Promise.all([
+    set(ref(db,'transactions'), null),
+    set(ref(db,'assets'), null),
+    set(ref(db,'debts'), null),
+    set(ref(db,'investments'), null),
+    set(ref(db,'goals'), null),
+  ]);
+  window.showToast('초기화 완료');
+};
+
+// ═══════════════════════════════════
+// XSS 방지
+// ═══════════════════════════════════
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════
+// 전체 렌더링
+// ═══════════════════════════════════
+window.renderAll = () => {
+  renderHome();
+  renderTransactions();
+  renderAssets();
+  renderGoals();
+  renderSettings();
+};
+
+// ═══════════════════════════════════
+// 초기화
+// ═══════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  const d = new Date();
+  document.getElementById('headerDate').textContent =
+    `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일`;
+  document.getElementById('txDate').value = window.today();
+  renderCategorySelect();
+  document.getElementById('assetModal').addEventListener('click', function(e) {
+    if (e.target === this) window.closeAssetModal();
+  });
+});
+</script>
+</body>
+</html>
